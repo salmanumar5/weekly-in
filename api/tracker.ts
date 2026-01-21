@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../lib/db';
+import { getDb } from '../lib/db.js';
 import { Status } from '../types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
