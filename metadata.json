@@ -1,0 +1,6 @@
+
+{
+  "name": "Weekly Availability Tracker",
+  "description": "A minimalist, Apple-inspired hybrid work planning tool for teams to track WFO and WFH status for the current week.",
+  "requestFramePermissions": []
+}
