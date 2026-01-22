@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../lib/db.js';
-import { Status } from '../types.js';
+import { getDb } from '../lib/db';
+import { Status } from '../types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = await getDb();
@@ -13,7 +13,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'login':
         if (method !== 'POST') return res.status(405).end();
         const { email, name } = req.body;
-        // Fix: Use 'any' type to allow assigning newUser (which lacks _id) to the user variable later.
         let user: any = await db.collection('users').findOne({ email: email.toLowerCase() });
         if (!user) {
           const newUser = {
@@ -23,7 +22,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
             createdAt: new Date()
           };
-          // Fix: Cast to any on line 26 to satisfy insertOne's internal WithId type requirement.
           await db.collection('users').insertOne(newUser as any);
           user = newUser;
         }
@@ -33,6 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { userId } = req.query;
         const teams = await db.collection('teams').find({ memberIds: userId }).toArray();
         return res.json(teams);
+
+      case 'getTeamMembers':
+        const { ids } = req.query;
+        if (!ids) return res.json([]);
+        const memberIds = (ids as string).split(',');
+        const members = await db.collection('users').find({ id: { $in: memberIds } }).toArray();
+        return res.json(members);
 
       case 'createTeam':
         const { teamName, adminId } = req.body;
@@ -49,14 +54,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'joinTeam':
         const { code, joinUserId } = req.body;
-        // Fix: Use any to avoid property access issues on potentially strict Document types.
         const teamToJoin: any = await db.collection('teams').findOne({ code: code.toUpperCase() });
         if (!teamToJoin) return res.status(404).json({ error: 'Team not found' });
         
         if (!teamToJoin.memberIds.includes(joinUserId)) {
           await db.collection('teams').updateOne(
             { id: teamToJoin.id },
-            // Fix: Cast update object to any to resolve line 56 "any not assignable to never" error.
             { $push: { memberIds: joinUserId } } as any
           );
           teamToJoin.memberIds.push(joinUserId);
@@ -69,7 +72,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!teamRef) return res.status(404).json({ error: 'Team not found' });
         if (teamRef.offDays.includes(dayIndex)) return res.status(400).json({ error: 'Cannot modify weekend' });
 
-        // Fix: Cast record to any for flexible property access and assignment.
         let record: any = await db.collection('availabilities').findOne({ userId: uId, teamId, weekId });
 
         if (record) {
@@ -93,7 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             days,
             updatedAt: Date.now()
           };
-          // Fix: Cast to any for insertOne on line 83 to bypass WithId validation.
           await db.collection('availabilities').insertOne(record as any);
         }
         return res.json(record);
@@ -122,7 +123,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await db.collection('teams').updateOne(
           { id: remTeamId },
-          // Fix: Cast update object to any to resolve line 119 "any not assignable to never" error.
           { $pull: { memberIds: targetMemberId } } as any
         );
         return res.json({ success: true });

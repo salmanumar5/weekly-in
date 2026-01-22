@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(api.getCurrentSession());
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [availabilities, setAvailabilities] = useState<AvailabilityRecord[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,10 +23,8 @@ const App: React.FC = () => {
   const currentWeekId = useMemo(() => getCurrentWeekId(), []);
   const weekDates = useMemo(() => getWeekDates(currentWeekId), [currentWeekId]);
 
-  // Derived State
   const activeTeam = useMemo(() => teams.find(t => t.id === activeTeamId) || null, [teams, activeTeamId]);
   
-  // Re-fetch everything on load or user change
   useEffect(() => {
     if (currentUser) {
       fetchData();
@@ -34,7 +33,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (activeTeamId) {
-      fetchTeamAvailabilities();
+      fetchTeamData();
     }
   }, [activeTeamId]);
 
@@ -54,13 +53,17 @@ const App: React.FC = () => {
     }
   };
 
-  const fetchTeamAvailabilities = async () => {
-    if (!activeTeamId) return;
+  const fetchTeamData = async () => {
+    if (!activeTeamId || !activeTeam) return;
     try {
-      const data = await api.getWeeklyAvailability(activeTeamId, currentWeekId);
-      setAvailabilities(data);
+      const [availData, memberData] = await Promise.all([
+        api.getWeeklyAvailability(activeTeamId, currentWeekId),
+        api.getTeamMembers(activeTeam.memberIds)
+      ]);
+      setAvailabilities(availData);
+      setTeamMembers(memberData);
     } catch (err) {
-      console.error("Failed to fetch availabilities:", err);
+      console.error("Failed to fetch team data:", err);
     }
   };
 
@@ -82,6 +85,7 @@ const App: React.FC = () => {
     setTeams([]);
     setActiveTeamId(null);
     setAvailabilities([]);
+    setTeamMembers([]);
   };
 
   const handleToggleAvailability = async (dayIndex: number) => {
@@ -90,8 +94,8 @@ const App: React.FC = () => {
     try {
       const updatedRecord = await api.updateAvailability(currentUser.id, activeTeamId, dayIndex);
       setAvailabilities(prev => {
-        const index = prev.findIndex(a => a.id === updatedRecord.id);
-        if (index > -1) return prev.map((a, i) => i === index ? updatedRecord : a);
+        const index = prev.findIndex(a => a.userId === currentUser.id);
+        if (index > -1) return prev.map(a => a.userId === currentUser.id ? updatedRecord : a);
         return [...prev, updatedRecord];
       });
     } catch (err: any) {
@@ -156,6 +160,7 @@ const App: React.FC = () => {
       try {
         await api.removeMember(activeTeam.id, currentUser.id, memberId);
         setTeams(prev => prev.map(t => t.id === activeTeam.id ? { ...t, memberIds: t.memberIds.filter(id => id !== memberId) } : t));
+        setTeamMembers(prev => prev.filter(m => m.id !== memberId));
       } catch (err) {
         alert("Failed to remove member.");
       } finally {
@@ -179,7 +184,6 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 overflow-y-auto no-scrollbar p-6 lg:p-10 relative">
-        {/* Sync Indicator */}
         {isSyncing && (
            <div className="fixed top-6 right-6 flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl border border-white z-50 animate-in fade-in slide-in-from-right-4">
              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
@@ -214,6 +218,7 @@ const App: React.FC = () => {
           {showSettings && activeTeam ? (
             <TeamSettings 
               team={activeTeam} 
+              members={teamMembers}
               onUpdateOffDays={handleUpdateOffDays}
               onRemoveMember={handleRemoveMember}
               onClose={() => setShowSettings(false)}
@@ -249,6 +254,7 @@ const App: React.FC = () => {
                   team={activeTeam} 
                   weekDates={weekDates} 
                   availabilities={availabilities}
+                  members={teamMembers}
                   currentUserId={currentUser.id}
                   onToggleCell={(userId, dayIndex) => {
                     if (userId === currentUser.id) handleToggleAvailability(dayIndex);

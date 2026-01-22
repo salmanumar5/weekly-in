@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Team, AvailabilityRecord, Status } from '../types';
+import { Team, AvailabilityRecord, Status, User } from '../types';
 import { DAYS_OF_WEEK } from '../constants';
 import { isToday as checkIsToday } from '../utils';
 
@@ -8,11 +8,12 @@ interface TeamTableProps {
   team: Team;
   weekDates: Date[];
   availabilities: AvailabilityRecord[];
+  members: User[];
   currentUserId: string;
   onToggleCell: (userId: string, dayIndex: number) => void;
 }
 
-const TeamTable: React.FC<TeamTableProps> = ({ team, weekDates, availabilities, currentUserId, onToggleCell }) => {
+const TeamTable: React.FC<TeamTableProps> = ({ team, weekDates, availabilities, members, currentUserId, onToggleCell }) => {
   return (
     <div className="glass rounded-[32px] overflow-hidden apple-shadow ring-1 ring-black/5">
       <div className="overflow-x-auto">
@@ -40,18 +41,28 @@ const TeamTable: React.FC<TeamTableProps> = ({ team, weekDates, availabilities, 
           <tbody className="divide-y divide-black/[0.03]">
             {team.memberIds.map(userId => {
               const record = availabilities.find(a => a.userId === userId);
+              const member = members.find(m => m.id === userId);
               const isSelf = userId === currentUserId;
+
+              // Generate initials for the avatar if no avatar is provided
+              const initials = member?.name 
+                ? member.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : 'MT';
 
               return (
                 <tr key={userId} className={`group transition-colors duration-300 hover:bg-white/50 ${isSelf ? 'bg-blue-50/20' : ''}`}>
                   <td className="p-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-[10px] font-bold border border-black/5 shadow-sm group-hover:scale-110 transition-transform">
-                        {isSelf ? 'YOU' : 'MT'}
-                      </div>
+                      {member?.avatar ? (
+                        <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-xl object-cover border border-black/5 shadow-sm group-hover:scale-110 transition-transform" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-[10px] font-bold border border-black/5 shadow-sm group-hover:scale-110 transition-transform">
+                          {initials}
+                        </div>
+                      )}
                       <div className="flex flex-col">
                         <span className={`text-sm font-bold ${isSelf ? 'text-blue-600' : 'text-black'}`}>
-                          {isSelf ? 'You' : `Member ${userId.slice(-4)}`}
+                          {isSelf ? 'You' : (member?.name || `Member ${userId.slice(-4)}`)}
                         </span>
                         <span className="text-[10px] font-medium text-black/30">
                           {userId === team.adminId ? 'Admin' : 'Member'}

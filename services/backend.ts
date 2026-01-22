@@ -10,21 +10,28 @@ class BackendService {
     url.searchParams.append('action', action);
     
     if (method === 'GET' && body) {
-      Object.keys(body).forEach(key => url.searchParams.append(key, body[key]));
+      Object.keys(body).forEach(key => {
+        if (body[key] !== undefined) url.searchParams.append(key, body[key]);
+      });
     }
 
-    const response = await fetch(url.toString(), {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: method !== 'GET' ? JSON.stringify(body) : undefined,
-    });
+    try {
+      const response = await fetch(url.toString(), {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: method !== 'GET' ? JSON.stringify(body) : undefined,
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Server request failed');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(error.error || `Server returned ${response.status}`);
+      }
+
+      return response.json();
+    } catch (e: any) {
+      console.error(`API Request Failed [${action}]:`, e);
+      throw e;
     }
-
-    return response.json();
   }
 
   // --- Auth ---
@@ -43,7 +50,6 @@ class BackendService {
     if (!data) return null;
     try {
       const session = JSON.parse(data);
-      // Session remains valid for 15 days from login
       if (Date.now() > session.expiry) {
         localStorage.removeItem(SESSION_KEY);
         return null;
@@ -77,6 +83,10 @@ class BackendService {
 
   async getMyTeams(userId: string): Promise<Team[]> {
     return this.request('getTeams', 'GET', { userId });
+  }
+
+  async getTeamMembers(ids: string[]): Promise<User[]> {
+    return this.request('getTeamMembers', 'GET', { ids: ids.join(',') });
   }
 
   // --- Availability ---
