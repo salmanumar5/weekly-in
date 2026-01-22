@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../lib/db';
-import { Status } from '../types';
+import { getDb } from '../lib/db.js';
+import { Status } from '../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = await getDb();
